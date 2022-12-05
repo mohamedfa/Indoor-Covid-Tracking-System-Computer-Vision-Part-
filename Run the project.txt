@@ -1,0 +1,4 @@
+cd project
+source project_env/bin/activate
+cd merge2
+python merge2.py
