@@ -92,166 +92,98 @@ GPIO.setmode(GPIO.BCM)
 GPIO.setup(relay, GPIO.OUT)
 GPIO.output(relay ,0)
 
-#lcd_init()
+lcd_init()
 
 def faceRecognition():
-	now = datetime.now()
-	time_hour = now.strftime('%H')
+    now = datetime.now()
+    time_hour = now.strftime('%H')
+    pplImages = []
+    pplNames = []
 
-	pplImages = []
-	pplNames = []
+    path = '/home/pi/Desktop/Face Recognition new try/Resources'
+    myList = os.listdir(path)
+    print(myList)
+    for cl in myList:
+        img = cv2.imread(f'{path}/{cl}')
+        pplImages.append(img)
+        pplNames.append(os.path.splitext(cl)[0])
+    print(pplNames)
 
-	path = '/home/pi/project/Merge/Resources'
-	myList = os.listdir(path)
-	print(myList)
-	for cl in myList:
-		img = cv2.imread(f'{path}/{cl}')
-		pplImages.append(img)
-		pplNames.append(os.path.splitext(cl)[0])
-	print(pplNames)
+    def findEncodings(images):
+        encodeList = []
+        for img in images:
+            img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+            encode = face_recognition.face_encodings(img)[0]
+            encodeList.append(encode)
+        return encodeList
 
-	def findEncodings(images):
-		encodeList = []
-		for img in images:
-			img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-			encode = face_recognition.face_encodings(img)[0]
-			encodeList.append(encode)
-		return encodeList
+    encodeListKnown = findEncodings(pplImages)
+    print('Encoding Complete')
 
-	encodeListKnown = findEncodings(pplImages)
-	print('Encoding Complete')
-
-	MODEL_MEAN_VALUES = (78.4263377603, 87.7689143744, 114.895847746)
-
-	def detect_and_predict_age(frame, faceNet, ageNet, genderNet):
-		AGE_BUCKETS = ["(0-2)", "(4-6)", "(8-12)", "(15-20)", "(25-32)", "(38-43)", "(48-53)", "(60-100)"]
-		GENDER_BUCKETS = ["Male", "Female"]
-		results = []
-		(h, w) = frame.shape[:2]
-		blob = cv2.dnn.blobFromImage(frame, 1.0, (300, 300),(104.0, 177.0, 123.0))
-		faceNet.setInput(blob)
-		detections = faceNet.forward()
-
-		for i in range(0, detections.shape[2]):
-			confidence = detections[0, 0, i, 2]
-			if confidence > 0.5:
-				box = detections[0, 0, i, 3:7] * np.array([w, h, w, h])
-				(startX, startY, endX, endY) = box.astype("int")
-				face = frame[startY:endY, startX:endX]
-				if face.shape[0] < 20 or face.shape[1] < 20:
-					continue
-				faceBlob = cv2.dnn.blobFromImage(face, 1, (227, 227), MODEL_MEAN_VALUES, swapRB=False)
-				global j
-				j = i
-				ageNet.setInput(faceBlob)
-				predsA = ageNet.forward()
-				i = predsA[0].argmax()
-				age = AGE_BUCKETS[i]
-				ageConfidence = predsA[0][i]
-				genderNet.setInput(faceBlob)
-				predsG = genderNet.forward()
-				j = predsG[0].argmax()
-				gender = GENDER_BUCKETS[j]
-				genderConfidence = predsG[0][j]
-				d = {"loc": (startX, startY, endX, endY), "age": (age, ageConfidence), "gender": (gender, genderConfidence)}
-				results.append(d)
-		return results
-
-	print("[INFO] Loading face detector model...")
-	prototxtPath = r"/home/pi/project/Merge/face_detector/deploy.prototxt"
-	weightsPath = r"/home/pi/project/Merge/face_detector/res10_300x300_ssd_iter_140000.caffemodel"
-	faceNet = cv2.dnn.readNet(prototxtPath, weightsPath)
-	print("[INFO] Loading age detector model...")
-	prototxtPath = r"/home/pi/project/Merge/age_detector/age_deploy.prototxt"
-	weightsPath = r"/home/pi/project/Merge/age_detector/age_net.caffemodel"
-	ageNet = cv2.dnn.readNet(prototxtPath, weightsPath)
-	print("[INFO] Loading gender detector model..")
-	prototxtPath = r"/home/pi/project/Merge/gender_detector/gender.prototxt"
-	weightsPath = r"/home/pi/project/Merge/gender_detector/gender_net.caffemodel"
-	genderNet = cv2.dnn.readNet(prototxtPath, weightsPath)
-
-	#camera_num = 0
-	#cam = cv2.VideoCapture(camera_num)
-	vs = VideoStream(src=0).start()
-	#lcd_string("Unwear Your Mask",LCD_LINE_1)
-    #lcd_string("Look at the Cam",LCD_LINE_2)
-
-	while True:
-	# success, frame = cam.read()
-		frame = vs.read()
-		frame = imutils.resize(frame, width=800)
-		imgX = cv2.resize(frame, (0, 0), None, 0.25, 0.25)
-		imgX = cv2.cvtColor(imgX, cv2.COLOR_BGR2RGB)
+    camera_num = 0
+    cam = cv2.VideoCapture(camera_num)
+    print("Unwear Your Mask")
+    lcd_string("Unwear Your Mask",LCD_LINE_1)
+    lcd_string("Look at the Cam",LCD_LINE_2)
     
-		results = detect_and_predict_age(imgX, faceNet, ageNet, genderNet)
-		'''
-		for r in results:
-        text = "{}: {:.2f}%".format(r["age"][0], r["age"][1] * 100) + "  " + "{}: {:.2f}%".format(r["gender"][0], r["gender"][1] * 100)
-        (startX, startY, endX, endY) = r["loc"]
-        y = startY - 20 if startY - 20 > 20 else startY + 20
-        cv2.rectangle(frame, (startX, startY), (endX, endY), (255, 255, 0), 3)
-        cv2.putText(frame, text, (startX, y), cv2.FONT_HERSHEY_SIMPLEX, 0.85, (205, 205, 0), 2)
-        '''
-        
+    while True:
+        success, frame = cam.read()
 
-		facesCurFrame = face_recognition.face_locations(imgX)
-		#print(facesCurFrame)
-    
-		encodesCurFrame = face_recognition.face_encodings(imgX, facesCurFrame)
+        imgX = cv2.resize(frame, (0, 0), None, 0.25, 0.25)
+        imgX = cv2.cvtColor(imgX, cv2.COLOR_BGR2RGB)
 
-		for encodeFace, faceLoc, result in zip(encodesCurFrame, facesCurFrame, results):
-			y1, x2, y2, x1 = faceLoc
-			matches = face_recognition.compare_faces(encodeListKnown, encodeFace)
-			faceDis = face_recognition.face_distance(encodeListKnown, encodeFace)
-        
-			text = "{}: {:.2f}%".format(result["age"][0], result["age"][1] * 100) + "  " + "{}: {:.2f}%".format(result["gender"][0], result["gender"][1] * 100)
-			#(startX, startY, endX, endY) = result["loc"]
-			#y = startY - 20 if startY - 20 > 20 else startY + 20
-			#cv2.rectangle(frame, (startX, startY), (endX, endY), (255, 255, 0), 3)
-			cv2.putText(frame, text, (x1 + 6, y2 - 6), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
+        facesCurFrame = face_recognition.face_locations(imgX)
 
+        encodesCurFrame = face_recognition.face_encodings(imgX, facesCurFrame)
 
-			matchIndex = np.argmin(faceDis)
+        for encodeFace, faceLoc in zip(encodesCurFrame, facesCurFrame):
+            matches = face_recognition.compare_faces(encodeListKnown, encodeFace)
+            faceDis = face_recognition.face_distance(encodeListKnown, encodeFace)
 
-			room_user=[]
-			if matches[matchIndex]:
-				name = pplNames[matchIndex].capitalize()
-				
-				return name
+            matchIndex = np.argmin(faceDis)
+            print(matchIndex)
 
-				for nm in room_user:
-					if name != nm:
-						room_user.append(name)
-						#sendData(matchIndex, camera_num, name, session_num)
-                    
-						sql_query = "insert into room_user(user_iduser, room_idroom, name, session_num) values(%s,%s,%s,%s)"
-						values = (2, camera_num, name, time_hour)
-						#mycursor.execute(sql_query, values)
-						#db_address.commit()
-
+            room_user=[]
+            if matches[matchIndex]:
+                name = pplNames[matchIndex].capitalize()
             
-				y1, x2, y2, x1 = y1 * 4, x2 * 4, y2 * 4, x1 * 4
-				cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
-				cv2.rectangle(frame, (x1, y2 - 35), (x2, y2), (0, 255, 0), cv2.FILLED)
-				cv2.putText(frame, name, (x1 + 6, y2 - 6), cv2.FONT_HERSHEY_COMPLEX, 1, (255, 255, 255), 2)
-				#markAttendance(name)
-			else:
-				y1, x2, y2, x1 = faceLoc
-				y1, x2, y2, x1 = y1 * 4, x2 * 4, y2 * 4, x1 * 4
-				cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 0, 255), 2)
-				cv2.rectangle(frame, (x1, y2 - 35), (x2, y2), (0, 0, 255), cv2.FILLED)
-				cv2.putText(frame, "Unknown", (x1 + 6, y2 - 6), cv2.FONT_HERSHEY_COMPLEX, 1, (255, 255, 255), 2)
+                y1, x2, y2, x1 = faceLoc
+                y1, x2, y2, x1 = y1 * 4, x2 * 4, y2 * 4, x1 * 4
+                cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
+                cv2.rectangle(frame, (x1, y2 - 35), (x2, y2), (0, 255, 0), cv2.FILLED)
+                cv2.putText(frame, name, (x1 + 6, y2 - 6), cv2.FONT_HERSHEY_COMPLEX, 1, (255, 255, 255), 2)
+                return name
 
-		cv2.imshow('WebCam', frame)
-		k = cv2.waitKey(1)
+                for nm in room_user:
+                    if nm != name:
+                        room_user.append(name)
+                        db_address = mysql.connector.connect(host="192.168.1.14", user="admin", password="root", database="covid")
+                        mycursor = db_address.cursor()
+                        sql_query = "insert into room_user(user_iduser, room_idroom, name, session_num) values(%s,%s,%s,%s)"
+                        values = (matchIndex, camera_num, name, time_hour)
+                        print(values)
+                        mycursor.execute(sql_query, values)
+                        db_address.commit()
+                        if db_address.is_connected():
+                            mycursor.close()
+                            db_address.close()
+                    
+            else:
+                y1, x2, y2, x1 = faceLoc
+                y1, x2, y2, x1 = y1 * 4, x2 * 4, y2 * 4, x1 * 4
+                cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 0, 255), 2)
+                cv2.rectangle(frame, (x1, y2 - 35), (x2, y2), (0, 0, 255), cv2.FILLED)
+                cv2.putText(frame, "Unknown", (x1 + 6, y2 - 6), cv2.FONT_HERSHEY_COMPLEX, 1, (255, 255, 255), 2)
 
-		# press 'ESC' to quit
-		if k == 27:
-			break
+        cv2.imshow('WebCam', frame)
+        k = cv2.waitKey(1)
 
-	vs.stop()
-	cv2.destroyAllWindows()
+        # press 'ESC' to quit
+        if k == 27:
+            break
 
+    cam.release()
+    cv2.destroyAllWindows()
 
 
 def maskDetector():
@@ -373,8 +305,8 @@ def maskDetector():
         cv2.imshow("Frame", frame)
         key = cv2.waitKey(1) & 0xFF
 
-        # if the `q` key was pressed, break from the loop
-        if key == ord("q"):
+        # press 'ESC' to quit
+        if k == 27:
             break
 
     # do a bit of cleanup
@@ -383,11 +315,9 @@ def maskDetector():
 
 
 faceRecognition()
-#lcd_init()
+lcd_init()
 sleep(2)
-#lcd_string("Wear Your Mask",LCD_LINE_1)
-#lcd_string(":)",LCD_LINE_2)
+lcd_string("Wear Your Mask",LCD_LINE_1)
+lcd_string(":)",LCD_LINE_2)
 print("Wear Your Mask")
-
 maskDetector()
-
