@@ -1,4 +1,4 @@
 cd project
 source project_env/bin/activate
-cd merge2
+cd main
 python code.py
